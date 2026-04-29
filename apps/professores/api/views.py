@@ -1,32 +1,146 @@
-"""Views do domínio Professores (EP-01 a EP-23)."""
-
-from datetime import date
+"""Views mock do domínio Professores (EP-01 a EP-23)."""
 
 from drf_spectacular.utils import OpenApiParameter, extend_schema
-from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.professores import repository
-from apps.professores.serializers import (
-    AtribuicaoDataSerializer,
-    AtribuicaoStatusSerializer,
-    AtribuicaoTurmaSerializer,
-    AutoCompleteSerializer,
-    NomePorRFSerializer,
-    ProfessorAtribuidoTurmaDiscSerializer,
-    ProfessorEscolaSerializer,
-    ProfessorPerfilSerializer,
-    ResumoSerializer,
-    TitularAgrupamentoSerializer,
-    TitularPorTurmaSerializer,
-    TitularSerializer,
-    TurmaAtribuidaSerializer,
-)
+from apps.core.mock_data import PROFESSOR_MOCK
 
 _TAG_PROF = ["Professores"]
 _TAG_TITULAR = ["Professores Titulares"]
+
+_NOME_MARIA_SILVA = "Maria Silva"
+_NOME_CARLOS_PEREIRA = "Carlos Pereira"
+_CARGO_PROFESSOR_FUNDAMENTAL_MEDIO = (
+    "Professor de Ensino Fundamental II e Médio"
+)
+_TURMA_1A_MANHA = "1A - Manhã"
+_CODIGO_RF_MARIA = "7654321"
+_CODIGO_RF_CARLOS = "1234567"
+
+_MOCK_PROFESSOR_LIST = [
+    {
+        "codigoRf": _CODIGO_RF_MARIA,
+        "nome": _NOME_MARIA_SILVA,
+        "componenteCurricular": "Língua Portuguesa",
+        "codigoComponenteCurricular": 138,
+        "cargo": _CARGO_PROFESSOR_FUNDAMENTAL_MEDIO,
+        "cpf": "123.456.789-00",
+        "dataInicioAtribuicao": "2024-02-01",
+        "dataFimAtribuicao": "2024-12-20",
+        "dataInicioExercicio": "2010-03-01",
+        "nomeTurma": _TURMA_1A_MANHA,
+        "codigoTurma": 2112345,
+        "turno": "M",
+        "tipoTurma": 1,
+    },
+    {
+        "codigoRf": _CODIGO_RF_CARLOS,
+        "nome": _NOME_CARLOS_PEREIRA,
+        "componenteCurricular": "Matemática",
+        "codigoComponenteCurricular": 139,
+        "cargo": _CARGO_PROFESSOR_FUNDAMENTAL_MEDIO,
+        "cpf": "111.222.333-44",
+        "dataInicioAtribuicao": "2024-02-01",
+        "dataFimAtribuicao": "2024-12-20",
+        "dataInicioExercicio": "2015-02-15",
+        "nomeTurma": "2B - Tarde",
+        "codigoTurma": 2112346,
+        "turno": "T",
+        "tipoTurma": 1,
+    },
+]
+
+_MOCK_TURMAS_LIST = [
+    {
+        "codigoTurma": 2112345,
+        "nomeTurma": _TURMA_1A_MANHA,
+        "codigoEscola": "000532",
+        "dataInicioAtribuicao": "2024-02-01",
+        "dataFimAtribuicao": "2024-12-20",
+        "codigoComponenteCurricular": 138,
+        "codigoGrade": 2070,
+        "codigoSerieGrade": 41005,
+        "anoAtribuicao": 2024,
+    }
+]
+
+_MOCK_PROF_TURMA = {
+    "codigoRf": _CODIGO_RF_MARIA,
+    "nome": _NOME_MARIA_SILVA,
+    "cpf": "123.456.789-00",
+    "codigoEscola": "000532",
+    "nomeTurma": _TURMA_1A_MANHA,
+    "codigoTurma": 2112345,
+    "cargo": _CARGO_PROFESSOR_FUNDAMENTAL_MEDIO,
+    "dataInicio": "2024-02-01",
+    "dataFim": "2024-12-20",
+}
+
+_MOCK_ATRIB_TURMA_DISC = [
+    {
+        "codigoRf": _CODIGO_RF_MARIA,
+        "nome": _NOME_MARIA_SILVA,
+        "cpf": "123.456.789-00",
+        "codigoComponenteCurricular": 138,
+        "dataAtribuicao": "2024-02-01",
+        "dataDisponibilizacao": "2024-12-20",
+        "atribuicaoExterna": False,
+    }
+]
+
+_MOCK_TITULAR = {
+    "codigoRf": _CODIGO_RF_MARIA,
+    "nome": _NOME_MARIA_SILVA,
+    "cpf": "123.456.789-00",
+}
+
+_MOCK_TITULARES_LIST = [
+    {
+        "codigoTurma": 2112345,
+        "codigoRf": _CODIGO_RF_MARIA,
+        "nome": _NOME_MARIA_SILVA,
+    }
+]
+
+_MOCK_TITULARES_TURMA = [
+    {
+        "codigoRf": _CODIGO_RF_MARIA,
+        "nome": _NOME_MARIA_SILVA,
+        "codigoComponenteCurricular": 138,
+        "codigoTerritorioSaber": 0,
+        "codigoExperienciaPedagogica": 0,
+    }
+]
+
+_MOCK_AUTOCOMPLETE = [
+    {"codigoRf": _CODIGO_RF_MARIA, "nomeServidor": _NOME_MARIA_SILVA},
+    {"codigoRf": _CODIGO_RF_CARLOS, "nomeServidor": _NOME_CARLOS_PEREIRA},
+]
+
+_MOCK_RESUMO = [
+    {
+        "codigoRf": _CODIGO_RF_MARIA,
+        "nome": _NOME_MARIA_SILVA,
+        "cpf": "123.456.789-00",
+    },
+    {
+        "codigoRf": _CODIGO_RF_CARLOS,
+        "nome": _NOME_CARLOS_PEREIRA,
+        "cpf": "111.222.333-44",
+    },
+]
+
+_MOCK_ATRIB_PERIODO = [
+    {"data": "2024-02-05", "possuiAtribuicao": True},
+    {"data": "2024-03-10", "possuiAtribuicao": True},
+]
+
+_MOCK_VERIF_TURMAS = [
+    {"codigoTurma": 2112345, "possuiAtribuicao": True},
+    {"codigoTurma": 2112346, "possuiAtribuicao": False},
+]
 
 
 # ---------------------------------------------------------------------------
@@ -44,18 +158,16 @@ class BuscaProfessoresView(APIView):
             OpenApiParameter("codigoEolEscola", str, OpenApiParameter.PATH),
             OpenApiParameter("anoLetivo", int, OpenApiParameter.PATH),
         ],
-        responses={200: ProfessorEscolaSerializer(many=True)},
+        responses={200: list},
     )
     def get(
         self,
         request: Request,
-        codigoEolEscola: str,
-        anoLetivo: int | None = None,
+        codigo_eol_escola: str,
+        ano_letivo: int | None = None,
     ) -> Response:
-        resultado = repository.buscar_professores_escola(
-            codigoEolEscola, anoLetivo or 0
-        )
-        return Response(resultado)
+        """Retorna lista mock de professores da escola."""
+        return Response(_MOCK_PROFESSOR_LIST)
 
 
 class BuscaTurmasAtribuidasEscolaView(APIView):
@@ -69,19 +181,17 @@ class BuscaTurmasAtribuidasEscolaView(APIView):
             OpenApiParameter("codigoEolEscola", str, OpenApiParameter.PATH),
             OpenApiParameter("anoLetivo", int, OpenApiParameter.PATH),
         ],
-        responses={200: TurmaAtribuidaSerializer(many=True)},
+        responses={200: list},
     )
     def get(
         self,
         request: Request,
-        codigoEolEscola: str,
-        anoLetivo: int,
-        codigoRF: str | None = None,
+        codigo_eol_escola: str,
+        ano_letivo: int,
+        codigo_rf: str | None = None,
     ) -> Response:
-        resultado = repository.buscar_turmas_professor_escola_ano(
-            codigoRF or "", codigoEolEscola, anoLetivo
-        )
-        return Response(resultado)
+        """Retorna lista mock de turmas atribuídas."""
+        return Response(_MOCK_TURMAS_LIST)
 
 
 # ---------------------------------------------------------------------------
@@ -98,19 +208,16 @@ class BuscarTurmasAtribuidasView(APIView):
         parameters=[
             OpenApiParameter("codigoRF", str, OpenApiParameter.PATH),
         ],
-        responses={200: TurmaAtribuidaSerializer(many=True)},
+        responses={200: list},
     )
     def get(
         self,
         request: Request,
-        codigoRF: str,
-        anoLetivo: int | None = None,
+        codigo_rf: str,
+        ano_letivo: int | None = None,
     ) -> Response:
-        if anoLetivo is not None:
-            resultado = repository.buscar_turmas_professor_ano(codigoRF, anoLetivo)
-        else:
-            resultado = repository.buscar_turmas_professor(codigoRF)
-        return Response(resultado)
+        """Retorna lista mock de turmas atribuídas."""
+        return Response(_MOCK_TURMAS_LIST)
 
 
 # ---------------------------------------------------------------------------
@@ -127,13 +234,13 @@ class ObterNomePeloRFView(APIView):
         parameters=[
             OpenApiParameter("rfProfessor", str, OpenApiParameter.PATH),
         ],
-        responses={200: NomePorRFSerializer, 404: dict},
+        responses={200: dict},
     )
-    def get(self, request: Request, rfProfessor: str) -> Response:
-        resultado = repository.obter_nome_rf(rfProfessor)
-        if resultado is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(resultado)
+    def get(self, request: Request, rf_professor: str) -> Response:
+        """Retorna nome mock do professor."""
+        return Response(
+            {"codigoRf": rf_professor, "nome": PROFESSOR_MOCK["nome"]}
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -151,16 +258,19 @@ class BuscarPorRfAnoLetivoView(APIView):
             OpenApiParameter("codigoRf", str, OpenApiParameter.PATH),
             OpenApiParameter("anoLetivo", int, OpenApiParameter.PATH),
             OpenApiParameter(
-                "buscarOutrosCargos", bool, OpenApiParameter.QUERY, required=False
+                "buscarOutrosCargos",
+                bool,
+                OpenApiParameter.QUERY,
+                required=False,
             ),
         ],
-        responses={200: ProfessorPerfilSerializer, 404: dict},
+        responses={200: dict},
     )
-    def get(self, request: Request, codigoRf: str, anoLetivo: int) -> Response:
-        resultado = repository.buscar_por_rf_ano(codigoRf, anoLetivo)
-        if resultado is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(resultado)
+    def get(
+        self, request: Request, codigo_rf: str, ano_letivo: int
+    ) -> Response:
+        """Retorna dados mock do professor."""
+        return Response(_MOCK_PROF_TURMA)
 
 
 class BuscarPorRfDreUeView(APIView):
@@ -172,24 +282,26 @@ class BuscarPorRfDreUeView(APIView):
         parameters=[
             OpenApiParameter("codigoRf", str, OpenApiParameter.PATH),
             OpenApiParameter("anoLetivo", int, OpenApiParameter.PATH),
-            OpenApiParameter("dreId", str, OpenApiParameter.QUERY, required=False),
-            OpenApiParameter("ueId", str, OpenApiParameter.QUERY, required=False),
             OpenApiParameter(
-                "buscarOutrosCargos", bool, OpenApiParameter.QUERY, required=False
+                "dreId", str, OpenApiParameter.QUERY, required=False
+            ),
+            OpenApiParameter(
+                "ueId", str, OpenApiParameter.QUERY, required=False
+            ),
+            OpenApiParameter(
+                "buscarOutrosCargos",
+                bool,
+                OpenApiParameter.QUERY,
+                required=False,
             ),
         ],
-        responses={200: ProfessorPerfilSerializer, 404: dict},
+        responses={200: dict},
     )
-    def get(self, request: Request, codigoRf: str, anoLetivo: int) -> Response:
-        resultado = repository.buscar_por_rf_dre_ue(
-            codigoRf,
-            anoLetivo,
-            dre_id=request.query_params.get("dreId"),
-            ue_id=request.query_params.get("ueId"),
-        )
-        if resultado is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(resultado)
+    def get(
+        self, request: Request, codigo_rf: str, ano_letivo: int
+    ) -> Response:
+        """Retorna dados mock do professor filtrado por DRE/UE."""
+        return Response(_MOCK_PROF_TURMA)
 
 
 # ---------------------------------------------------------------------------
@@ -206,19 +318,20 @@ class AutoCompleteView(APIView):
         parameters=[
             OpenApiParameter("anoLetivo", int, OpenApiParameter.PATH),
             OpenApiParameter("dreId", str, OpenApiParameter.PATH),
-            OpenApiParameter("ueId", str, OpenApiParameter.QUERY, required=False),
-            OpenApiParameter("nome", str, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter(
+                "ueId", str, OpenApiParameter.QUERY, required=False
+            ),
+            OpenApiParameter(
+                "nome", str, OpenApiParameter.QUERY, required=False
+            ),
         ],
-        responses={200: AutoCompleteSerializer(many=True)},
+        responses={200: list},
     )
-    def get(self, request: Request, anoLetivo: int, dreId: str) -> Response:
-        resultado = repository.autocomplete_professores(
-            anoLetivo,
-            dreId,
-            ue_id=request.query_params.get("ueId"),
-            nome=request.query_params.get("nome"),
-        )
-        return Response(resultado)
+    def get(
+        self, request: Request, ano_letivo: int, dre_id: str
+    ) -> Response:
+        """Retorna lista mock de professores para autocomplete."""
+        return Response(_MOCK_AUTOCOMPLETE)
 
 
 # ---------------------------------------------------------------------------
@@ -236,12 +349,11 @@ class BuscarPorListaRFView(APIView):
             OpenApiParameter("anoLetivo", int, OpenApiParameter.PATH),
         ],
         request=list,
-        responses={200: ResumoSerializer(many=True)},
+        responses={200: list},
     )
-    def post(self, request: Request, anoLetivo: int) -> Response:
-        lista_rf = request.data if isinstance(request.data, list) else []
-        resultado = repository.buscar_por_lista_rf(anoLetivo, lista_rf)
-        return Response(resultado)
+    def post(self, request: Request, ano_letivo: int) -> Response:
+        """Retorna lista mock de professores."""
+        return Response(_MOCK_RESUMO)
 
 
 # ---------------------------------------------------------------------------
@@ -260,8 +372,9 @@ class VerificarValidadeView(APIView):
         ],
         responses={200: bool},
     )
-    def get(self, request: Request, codigoRf: str) -> Response:
-        return Response(repository.verificar_validade(codigoRf))
+    def get(self, request: Request, codigo_rf: str) -> Response:
+        """Retorna true (professor válido)."""
+        return Response(True)
 
 
 # ---------------------------------------------------------------------------
@@ -280,8 +393,9 @@ class EhEmeiView(APIView):
         ],
         responses={200: bool, 400: dict},
     )
-    def get(self, request: Request, codigoRF: str) -> Response:
-        return Response(repository.eh_emei(codigoRF))
+    def get(self, request: Request, codigo_rf: str) -> Response:
+        """Retorna false (professor não é EMEI no mock)."""
+        return Response(False)
 
 
 # ---------------------------------------------------------------------------
@@ -299,10 +413,19 @@ class AtribuicaoStatusView(APIView):
             OpenApiParameter("codigoRF", str, OpenApiParameter.PATH),
             OpenApiParameter("codigoTurma", int, OpenApiParameter.PATH),
         ],
-        responses={200: AtribuicaoStatusSerializer, 422: dict, 500: dict},
+        responses={200: dict, 422: dict, 500: dict},
     )
-    def get(self, request: Request, codigoRF: str, codigoTurma: int) -> Response:
-        return Response(repository.atribuicao_status(codigoRF, codigoTurma))
+    def get(
+        self, request: Request, codigo_rf: str, codigo_turma: int
+    ) -> Response:
+        """Retorna status de atribuição mock."""
+        return Response(
+            {
+                "possuiAtribuicao": True,
+                "codigoRf": codigo_rf,
+                "codigoTurma": codigo_turma,
+            }
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -320,17 +443,19 @@ class AtribuicaoVerificarDataView(APIView):
             OpenApiParameter("codigoRF", str, OpenApiParameter.PATH),
             OpenApiParameter("codigoTurma", int, OpenApiParameter.PATH),
             OpenApiParameter(
-                "dataConsulta", str, OpenApiParameter.QUERY, required=False
+                "dataConsulta",
+                str,
+                OpenApiParameter.QUERY,
+                required=False,
             ),
         ],
         responses={200: bool, 400: dict, 422: dict, 500: dict},
     )
-    def get(self, request: Request, codigoRF: str, codigoTurma: int) -> Response:
-        data_str = request.query_params.get("dataConsulta")
-        data: date | None = date.fromisoformat(data_str) if data_str else None
-        return Response(
-            repository.atribuicao_verificar_data(codigoRF, codigoTurma, data)
-        )
+    def get(
+        self, request: Request, codigo_rf: str, codigo_turma: int
+    ) -> Response:
+        """Retorna true (possui atribuição) no mock."""
+        return Response(True)
 
 
 # ---------------------------------------------------------------------------
@@ -349,10 +474,16 @@ class AtribuicaoDisciplinaDataView(APIView):
             OpenApiParameter("codigoTurma", int, OpenApiParameter.PATH),
             OpenApiParameter("disciplinaId", int, OpenApiParameter.PATH),
             OpenApiParameter(
-                "dataConsulta", str, OpenApiParameter.QUERY, required=False
+                "dataConsulta",
+                str,
+                OpenApiParameter.QUERY,
+                required=False,
             ),
             OpenApiParameter(
-                "territorioSaber", bool, OpenApiParameter.QUERY, required=False
+                "territorioSaber",
+                bool,
+                OpenApiParameter.QUERY,
+                required=False,
             ),
         ],
         responses={200: bool, 400: dict, 422: dict, 500: dict},
@@ -360,18 +491,12 @@ class AtribuicaoDisciplinaDataView(APIView):
     def get(
         self,
         request: Request,
-        codigoRF: str,
-        codigoTurma: int,
-        disciplinaId: int,
+        codigo_rf: str,
+        codigo_turma: int,
+        disciplina_id: int,
     ) -> Response:
-        data_str = request.query_params.get("dataConsulta")
-        data: date | None = date.fromisoformat(data_str) if data_str else None
-        territorio = request.query_params.get("territorioSaber", "").lower() == "true"
-        return Response(
-            repository.atribuicao_disciplina_data(
-                codigoRF, codigoTurma, disciplinaId, data, territorio
-            )
-        )
+        """Retorna true (possui atribuição) no mock."""
+        return Response(True)
 
 
 # ---------------------------------------------------------------------------
@@ -384,13 +509,18 @@ class AtribuicaoDisciplinaDataTickView(APIView):
 
     @extend_schema(
         tags=_TAG_PROF,
-        summary="EP-15 | Verificar atribuição na disciplina/turma via dataTick",
+        summary=(
+            "EP-15 | Verificar atribuição na disciplina/turma via dataTick"
+        ),
         parameters=[
             OpenApiParameter("codigoRF", str, OpenApiParameter.PATH),
             OpenApiParameter("codigoTurma", int, OpenApiParameter.PATH),
             OpenApiParameter("disciplinaId", int, OpenApiParameter.PATH),
             OpenApiParameter(
-                "dataConsultaTick", int, OpenApiParameter.QUERY, required=False
+                "dataConsultaTick",
+                int,
+                OpenApiParameter.QUERY,
+                required=False,
             ),
         ],
         responses={200: bool, 400: dict, 422: dict, 500: dict},
@@ -398,17 +528,12 @@ class AtribuicaoDisciplinaDataTickView(APIView):
     def get(
         self,
         request: Request,
-        codigoRF: str,
-        codigoTurma: int,
-        disciplinaId: int,
+        codigo_rf: str,
+        codigo_turma: int,
+        disciplina_id: int,
     ) -> Response:
-        tick_str = request.query_params.get("dataConsultaTick")
-        tick = int(tick_str) if tick_str else None
-        return Response(
-            repository.atribuicao_disciplina_datatick(
-                codigoRF, codigoTurma, disciplinaId, tick
-            )
-        )
+        """Retorna true (possui atribuição) no mock."""
+        return Response(True)
 
 
 # ---------------------------------------------------------------------------
@@ -430,24 +555,24 @@ class AtribuicaoRecorrenciaDatasView(APIView):
             OpenApiParameter("codigoTurma", int, OpenApiParameter.PATH),
             OpenApiParameter("disciplinaId", int, OpenApiParameter.PATH),
             OpenApiParameter(
-                "dataTicks", int, OpenApiParameter.QUERY, required=False, many=True
+                "dataTicks",
+                int,
+                OpenApiParameter.QUERY,
+                required=False,
+                many=True,
             ),
         ],
-        responses={200: AtribuicaoDataSerializer(many=True), 400: dict, 422: dict, 500: dict},
+        responses={200: list, 400: dict, 422: dict, 500: dict},
     )
     def get(
         self,
         request: Request,
-        codigoRF: str,
-        codigoTurma: int,
-        disciplinaId: int,
+        codigo_rf: str,
+        codigo_turma: int,
+        disciplina_id: int,
     ) -> Response:
-        ticks = [int(t) for t in request.query_params.getlist("dataTicks")]
-        return Response(
-            repository.atribuicao_recorrencia_datas(
-                codigoRF, codigoTurma, disciplinaId, ticks
-            )
-        )
+        """Retorna lista mock de datas com status de atribuição."""
+        return Response(_MOCK_ATRIB_PERIODO)
 
 
 # ---------------------------------------------------------------------------
@@ -460,19 +585,21 @@ class AtribuicaoTurmasListaView(APIView):
 
     @extend_schema(
         tags=_TAG_PROF,
-        summary="EP-17 | Verificar atribuição em turmas por disciplina (POST)",
+        summary=(
+            "EP-17 | Verificar atribuição em turmas por disciplina (POST)"
+        ),
         parameters=[
             OpenApiParameter("codigoRf", str, OpenApiParameter.PATH),
             OpenApiParameter("disciplinaId", int, OpenApiParameter.PATH),
         ],
         request=list,
-        responses={200: AtribuicaoTurmaSerializer(many=True)},
+        responses={200: list},
     )
-    def post(self, request: Request, codigoRf: str, disciplinaId: int) -> Response:
-        codigos_turma = request.data if isinstance(request.data, list) else []
-        return Response(
-            repository.atribuicao_turmas_lista(codigoRf, disciplinaId, codigos_turma)
-        )
+    def post(
+        self, request: Request, codigo_rf: str, disciplina_id: int
+    ) -> Response:
+        """Retorna lista mock de turmas com status de atribuição."""
+        return Response(_MOCK_VERIF_TURMAS)
 
 
 # ---------------------------------------------------------------------------
@@ -489,8 +616,12 @@ class AtribuicaoPeriodoView(APIView):
         parameters=[
             OpenApiParameter("codigoRf", str, OpenApiParameter.PATH),
             OpenApiParameter("codigoTurma", int, OpenApiParameter.PATH),
-            OpenApiParameter("componenteCurricularId", int, OpenApiParameter.PATH),
-            OpenApiParameter("dataInicioPeriodo", str, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "componenteCurricularId", int, OpenApiParameter.PATH
+            ),
+            OpenApiParameter(
+                "dataInicioPeriodo", str, OpenApiParameter.PATH
+            ),
             OpenApiParameter("dataFimPeriodo", str, OpenApiParameter.PATH),
         ],
         responses={200: bool, 400: dict, 422: dict, 500: dict},
@@ -498,21 +629,14 @@ class AtribuicaoPeriodoView(APIView):
     def post(
         self,
         request: Request,
-        codigoRf: str,
-        codigoTurma: int,
-        componenteCurricularId: int,
-        dataInicioPeriodo: str,
-        dataFimPeriodo: str,
+        codigo_rf: str,
+        codigo_turma: int,
+        componente_curricular_id: int,
+        data_inicio_periodo: str,
+        data_fim_periodo: str,
     ) -> Response:
-        return Response(
-            repository.atribuicao_periodo(
-                codigoRf,
-                codigoTurma,
-                componenteCurricularId,
-                date.fromisoformat(dataInicioPeriodo),
-                date.fromisoformat(dataFimPeriodo),
-            )
-        )
+        """Retorna true (possui atribuição no período) no mock."""
+        return Response(True)
 
 
 # ---------------------------------------------------------------------------
@@ -525,29 +649,26 @@ class ObterProfessoresAtribuidosTurmaDiscView(APIView):
 
     @extend_schema(
         tags=_TAG_PROF,
-        summary="EP-19 | Obter professores atribuídos a turma/disciplina em data",
+        summary=(
+            "EP-19 | Obter professores atribuídos a turma/disciplina em data"
+        ),
         parameters=[
             OpenApiParameter("codigoTurma", int, OpenApiParameter.PATH),
             OpenApiParameter("disciplinaId", int, OpenApiParameter.PATH),
             OpenApiParameter(
-                "dataTicks", int, OpenApiParameter.QUERY, required=False
+                "dataTicks",
+                int,
+                OpenApiParameter.QUERY,
+                required=False,
             ),
         ],
-        responses={
-            200: ProfessorAtribuidoTurmaDiscSerializer(many=True),
-            400: dict,
-            422: dict,
-            500: dict,
-        },
+        responses={200: list, 400: dict, 422: dict, 500: dict},
     )
-    def get(self, request: Request, codigoTurma: int, disciplinaId: int) -> Response:
-        tick_str = request.query_params.get("dataTicks")
-        tick = int(tick_str) if tick_str else None
-        return Response(
-            repository.professores_atribuidos_turma_disc(
-                codigoTurma, disciplinaId, tick
-            )
-        )
+    def get(
+        self, request: Request, codigo_turma: int, disciplina_id: int
+    ) -> Response:
+        """Retorna lista mock de professores atribuídos."""
+        return Response(_MOCK_ATRIB_TURMA_DISC)
 
 
 # ---------------------------------------------------------------------------
@@ -567,20 +688,16 @@ class TitularPorTurmaDisciplinaView(APIView):
                 "codigoComponenteCurricular", int, OpenApiParameter.PATH
             ),
         ],
-        responses={200: TitularSerializer, 404: dict},
+        responses={200: dict},
     )
     def get(
         self,
         request: Request,
-        codigoTurma: int,
-        codigoComponenteCurricular: int,
+        codigo_turma: int,
+        codigo_componente_curricular: int,
     ) -> Response:
-        resultado = repository.titular_por_turma_disciplina(
-            codigoTurma, codigoComponenteCurricular
-        )
-        if resultado is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(resultado)
+        """Retorna titular mock."""
+        return Response(_MOCK_TITULAR)
 
 
 # ---------------------------------------------------------------------------
@@ -603,11 +720,11 @@ class TitularesPorTurmasView(APIView):
                 many=True,
             ),
         ],
-        responses={200: TitularPorTurmaSerializer(many=True)},
+        responses={200: list},
     )
     def get(self, request: Request) -> Response:
-        codigos = [int(c) for c in request.query_params.getlist("codigosTurmas")]
-        return Response(repository.titulares_por_turmas(codigos))
+        """Retorna lista mock de titulares."""
+        return Response(_MOCK_TITULARES_LIST)
 
 
 # ---------------------------------------------------------------------------
@@ -620,36 +737,37 @@ class TitularesPorTurmaAgrupamentoView(APIView):
 
     @extend_schema(
         tags=_TAG_TITULAR,
-        summary="EP-22 | Buscar professores titulares por turma com agrupamento",
+        summary=(
+            "EP-22 | Buscar professores titulares por turma com agrupamento"
+        ),
         parameters=[
             OpenApiParameter("codigoTurma", int, OpenApiParameter.PATH),
-            OpenApiParameter("realizaAgrupamento", str, OpenApiParameter.PATH),
             OpenApiParameter(
-                "codigoRF", str, OpenApiParameter.QUERY, required=False
+                "realizaAgrupamento", str, OpenApiParameter.PATH
             ),
             OpenApiParameter(
-                "dataReferencia", str, OpenApiParameter.QUERY, required=False
+                "codigoRF",
+                str,
+                OpenApiParameter.QUERY,
+                required=False,
+            ),
+            OpenApiParameter(
+                "dataReferencia",
+                str,
+                OpenApiParameter.QUERY,
+                required=False,
             ),
         ],
-        responses={200: TitularAgrupamentoSerializer(many=True)},
+        responses={200: list},
     )
     def get(
         self,
         request: Request,
-        codigoTurma: int,
-        realizaAgrupamento: str,
+        codigo_turma: int,
+        realiza_agrupamento: str,
     ) -> Response:
-        agrupamento = realizaAgrupamento.lower() == "true"
-        data_str = request.query_params.get("dataReferencia")
-        data: date | None = date.fromisoformat(data_str) if data_str else None
-        return Response(
-            repository.titulares_por_turma_agrupamento(
-                codigoTurma,
-                agrupamento,
-                codigo_rf=request.query_params.get("codigoRF"),
-                data_referencia=data,
-            )
-        )
+        """Retorna lista mock de titulares com componentes."""
+        return Response(_MOCK_TITULARES_TURMA)
 
 
 # ---------------------------------------------------------------------------
@@ -662,7 +780,9 @@ class TitularesPorUeView(APIView):
 
     @extend_schema(
         tags=_TAG_TITULAR,
-        summary="EP-23 | Buscar professores titulares por UE e data de referência",
+        summary=(
+            "EP-23 | Buscar professores titulares por UE e data de referência"
+        ),
         parameters=[
             OpenApiParameter("ueCodigo", str, OpenApiParameter.PATH),
             OpenApiParameter("dataReferencia", str, OpenApiParameter.PATH),
@@ -673,21 +793,13 @@ class TitularesPorUeView(APIView):
                 required=False,
             ),
         ],
-        responses={200: TitularAgrupamentoSerializer(many=True)},
+        responses={200: list},
     )
     def get(
         self,
         request: Request,
-        ueCodigo: str,
-        dataReferencia: str,
+        ue_codigo: str,
+        data_referencia: str,
     ) -> Response:
-        agrupamento = (
-            request.query_params.get("realizaAgrupamento", "").lower() == "true"
-        )
-        return Response(
-            repository.titulares_por_ue(
-                ueCodigo,
-                date.fromisoformat(dataReferencia),
-                realiza_agrupamento=agrupamento,
-            )
-        )
+        """Retorna lista mock de titulares da UE."""
+        return Response(_MOCK_TITULARES_TURMA)

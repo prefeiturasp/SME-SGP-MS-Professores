@@ -24,7 +24,10 @@ class TurmasHistoricasAnoProfessorView(APIView):
         responses={200: TurmaHistoricaSerializer(many=True), 400: dict, 404: dict},
     )
     def get(
-        self, request: Request, anoLetivo: int, professorRf: str
+        self,
+        request: Request,
+        ano_letivo: int,
+        professor_rf: str,
     ) -> Response:
-        resultado = repository.turmas_historicas_professor(anoLetivo, professorRf)
+        resultado = repository.turmas_historicas_professor(ano_letivo, professor_rf)
         return Response(resultado)

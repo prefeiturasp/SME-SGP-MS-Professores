@@ -1,27 +1,108 @@
-"""Views do domínio Funcionários (EP-25 a EP-39)."""
+"""Views mock do domínio Funcionários (EP-25 a EP-39)."""
 
 from drf_spectacular.utils import OpenApiParameter, extend_schema
-from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.funcionarios import repository
-from apps.funcionarios.serializers import (
-    DreUeAtribuicaoSerializer,
-    DreUeCargoSerializer,
-    FuncionarioExternoCpfSerializer,
-    FuncionarioFuncaoExternaSerializer,
-    FuncionarioUESerializer,
-    NomeServidorSerializer,
-    ResumoFuncionarioSerializer,
-    UsuarioSGPSerializer,
-)
+from apps.core.mock_data import PROFESSOR_EXTERNO_MOCK
 
 _TAG_FUNC = ["Funcionários"]
 _TAG_ESCOLA_FUNC = ["Funcionários por Escola"]
 _TAG_PERFIL = ["Perfis SGP"]
 _TAG_ACESSO = ["Acessos"]
+
+_NOME_MARIA_SILVA = "Maria Silva"
+_NOME_CARLOS_PEREIRA = "Carlos Pereira"
+_CARGO_PROFESSOR_FUNDAMENTAL_MEDIO = (
+    "Professor de Ensino Fundamental II e Médio"
+)
+_CODIGO_RF_MARIA = "7654321"
+_CODIGO_RF_CARLOS = "1234567"
+
+_MOCK_FUNC_LIST = [
+    {
+        "codigoRf": _CODIGO_RF_MARIA,
+        "nomeServidor": _NOME_MARIA_SILVA,
+        "cargo": _CARGO_PROFESSOR_FUNDAMENTAL_MEDIO,
+        "dataInicio": "2024-02-01",
+        "dataFim": None,
+    },
+    {
+        "codigoRf": _CODIGO_RF_CARLOS,
+        "nomeServidor": _NOME_CARLOS_PEREIRA,
+        "cargo": "Diretor de Escola",
+        "dataInicio": "2023-01-15",
+        "dataFim": None,
+    },
+]
+
+_MOCK_FUNC_EXTERNO_LIST = [
+    {
+        "cpf": "987.654.321-00",
+        "nomeServidor": "João Souza",
+        "codigoEscola": "000532",
+        "dataInicio": "2024-02-01",
+    }
+]
+
+_MOCK_CARGOS = [
+    {
+        "codigoRf": _CODIGO_RF_MARIA,
+        "nomeServidor": _NOME_MARIA_SILVA,
+        "dataInicio": "2010-03-01",
+        "dataFim": None,
+        "cargo": _CARGO_PROFESSOR_FUNDAMENTAL_MEDIO,
+    }
+]
+
+_MOCK_NOME_SERVIDOR = {
+    "codigoRf": _CODIGO_RF_MARIA,
+    "nome": _NOME_MARIA_SILVA,
+    "cpf": "123.456.789-00",
+}
+
+_MOCK_DRE_UE = {
+    "codigoRf": _CODIGO_RF_MARIA,
+    "nome": _NOME_MARIA_SILVA,
+    "codigoDre": "108100",
+    "codigoUe": "000532",
+}
+
+_MOCK_DRE_UE_CARGO = {
+    "codigoRf": _CODIGO_RF_MARIA,
+    "codigoDre": "108100",
+    "codigoUe": "000532",
+    "cargo": _CARGO_PROFESSOR_FUNDAMENTAL_MEDIO,
+}
+
+_MOCK_USUARIOS_SGP = [
+    {
+        "codigoRf": _CODIGO_RF_MARIA,
+        "nomeServidor": _NOME_MARIA_SILVA,
+        "codigoDre": "108100",
+        "codigoUe": "000532",
+    },
+    {
+        "codigoRf": _CODIGO_RF_CARLOS,
+        "nomeServidor": _NOME_CARLOS_PEREIRA,
+        "codigoDre": "108100",
+        "codigoUe": "000532",
+    },
+]
+
+_MOCK_RESUMO = [
+    {
+        "codigoRf": _CODIGO_RF_MARIA,
+        "nome": _NOME_MARIA_SILVA,
+        "cpf": "123.456.789-00",
+    },
+    {
+        "codigoRf": _CODIGO_RF_CARLOS,
+        "nome": _NOME_CARLOS_PEREIRA,
+        "cpf": "111.222.333-44",
+    },
+]
 
 
 # ---------------------------------------------------------------------------
@@ -38,19 +119,16 @@ class FuncionariosPorUEView(APIView):
         parameters=[
             OpenApiParameter("codigoUE", str, OpenApiParameter.PATH),
         ],
-        responses={200: FuncionarioUESerializer(many=True)},
+        responses={200: list},
     )
     def get(
         self,
         request: Request,
-        codigoUE: str,
-        codigoCargo: int | None = None,
+        codigo_ue: str,
+        codigo_cargo: int | None = None,
     ) -> Response:
-        if codigoCargo is not None:
-            resultado = repository.funcionarios_por_ue_cargo(codigoUE, codigoCargo)
-        else:
-            resultado = repository.funcionarios_por_ue(codigoUE)
-        return Response(resultado)
+        """Retorna lista mock de funcionários."""
+        return Response(_MOCK_FUNC_LIST)
 
 
 # ---------------------------------------------------------------------------
@@ -63,25 +141,27 @@ class FuncionariosCargosQueryView(APIView):
 
     @extend_schema(
         tags=_TAG_ESCOLA_FUNC,
-        summary="EP-26-B | Funcionários de uma UE por lista de cargos (query)",
+        summary=(
+            "EP-26-B | Funcionários de uma UE por lista de cargos (query)"
+        ),
         parameters=[
             OpenApiParameter("ueCodigo", str, OpenApiParameter.PATH),
             OpenApiParameter(
-                "cargos", int, OpenApiParameter.QUERY, required=False, many=True
+                "cargos",
+                int,
+                OpenApiParameter.QUERY,
+                required=False,
+                many=True,
             ),
             OpenApiParameter(
                 "dreCodigo", str, OpenApiParameter.QUERY, required=False
             ),
         ],
-        responses={200: FuncionarioUESerializer(many=True)},
+        responses={200: list},
     )
-    def get(self, request: Request, ueCodigo: str) -> Response:
-        cargos = [int(c) for c in request.query_params.getlist("cargos")]
-        if cargos:
-            resultado = repository.funcionarios_por_lista_cargos(ueCodigo, cargos)
-        else:
-            resultado = repository.funcionarios_por_ue(ueCodigo)
-        return Response(resultado)
+    def get(self, request: Request, ue_codigo: str) -> Response:
+        """Retorna lista mock de funcionários por cargos."""
+        return Response(_MOCK_FUNC_LIST)
 
 
 # ---------------------------------------------------------------------------
@@ -97,20 +177,20 @@ class FuncionariosFuncaoAtividadeView(APIView):
         summary="EP-27 | Funcionários de uma UE por função de atividade",
         parameters=[
             OpenApiParameter("codigoUE", str, OpenApiParameter.PATH),
-            OpenApiParameter("codigoFuncaoAtividade", int, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "codigoFuncaoAtividade", int, OpenApiParameter.PATH
+            ),
         ],
-        responses={200: FuncionarioUESerializer(many=True)},
+        responses={200: list},
     )
     def get(
         self,
         request: Request,
-        codigoUE: str,
-        codigoFuncaoAtividade: int | None = None,
+        codigo_ue: str,
+        codigo_funcao_atividade: int | None = None,
     ) -> Response:
-        resultado = repository.funcionarios_por_funcao_atividade(
-            codigoUE, codigoFuncaoAtividade or 0
-        )
-        return Response(resultado)
+        """Retorna lista mock de funcionários por função de atividade."""
+        return Response(_MOCK_FUNC_LIST)
 
 
 # ---------------------------------------------------------------------------
@@ -123,7 +203,9 @@ class FuncionariosFuncoesAtividadesQueryView(APIView):
 
     @extend_schema(
         tags=_TAG_ESCOLA_FUNC,
-        summary="EP-27-B | Funcionários de UE por lista de funções de atividade",
+        summary=(
+            "EP-27-B | Funcionários de UE por lista de funções de atividade"
+        ),
         parameters=[
             OpenApiParameter("ueCodigo", str, OpenApiParameter.PATH),
             OpenApiParameter(
@@ -137,12 +219,11 @@ class FuncionariosFuncoesAtividadesQueryView(APIView):
                 "dreCodigo", str, OpenApiParameter.QUERY, required=True
             ),
         ],
-        responses={200: FuncionarioUESerializer(many=True)},
+        responses={200: list},
     )
-    def get(self, request: Request, ueCodigo: str) -> Response:
-        funcoes = [int(f) for f in request.query_params.getlist("funcoesAtividades")]
-        resultado = repository.funcionarios_por_lista_funcoes_atividade(ueCodigo, funcoes)
-        return Response(resultado)
+    def get(self, request: Request, ue_codigo: str) -> Response:
+        """Retorna lista mock de funcionários por funções de atividade."""
+        return Response(_MOCK_FUNC_LIST)
 
 
 # ---------------------------------------------------------------------------
@@ -158,20 +239,20 @@ class FuncionariosFuncaoExternaView(APIView):
         summary="EP-28 | Funcionários de uma UE por função externa",
         parameters=[
             OpenApiParameter("codigoUE", str, OpenApiParameter.PATH),
-            OpenApiParameter("codigoFuncaoExterna", int, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "codigoFuncaoExterna", int, OpenApiParameter.PATH
+            ),
         ],
-        responses={200: FuncionarioFuncaoExternaSerializer(many=True)},
+        responses={200: list},
     )
     def get(
         self,
         request: Request,
-        codigoUE: str,
-        codigoFuncaoExterna: int | None = None,
+        codigo_ue: str,
+        codigo_funcao_externa: int | None = None,
     ) -> Response:
-        resultado = repository.funcionarios_por_funcao_externa(
-            codigoUE, codigoFuncaoExterna or 0
-        )
-        return Response(resultado)
+        """Retorna lista mock de funcionários externos."""
+        return Response(_MOCK_FUNC_EXTERNO_LIST)
 
 
 # ---------------------------------------------------------------------------
@@ -184,22 +265,27 @@ class FuncionariosFuncoesExternasQueryView(APIView):
 
     @extend_schema(
         tags=_TAG_ESCOLA_FUNC,
-        summary="EP-28-B | Funcionários de UE por lista de funções externas",
+        summary=(
+            "EP-28-B | Funcionários de UE por lista de funções externas"
+        ),
         parameters=[
             OpenApiParameter("ueCodigo", str, OpenApiParameter.PATH),
             OpenApiParameter(
-                "funcoes", int, OpenApiParameter.QUERY, required=False, many=True
+                "funcoes",
+                int,
+                OpenApiParameter.QUERY,
+                required=False,
+                many=True,
             ),
             OpenApiParameter(
                 "dreCodigo", str, OpenApiParameter.QUERY, required=False
             ),
         ],
-        responses={200: FuncionarioFuncaoExternaSerializer(many=True)},
+        responses={200: list},
     )
-    def get(self, request: Request, ueCodigo: str) -> Response:
-        funcoes = [int(f) for f in request.query_params.getlist("funcoes")]
-        resultado = repository.funcionarios_por_lista_funcoes_externas(ueCodigo, funcoes)
-        return Response(resultado)
+    def get(self, request: Request, ue_codigo: str) -> Response:
+        """Retorna lista mock de funcionários externos por funções."""
+        return Response(_MOCK_FUNC_EXTERNO_LIST)
 
 
 # ---------------------------------------------------------------------------
@@ -214,12 +300,17 @@ class CargosFuncionarioView(APIView):
         tags=_TAG_FUNC,
         summary="EP-29 | Obter cargos do funcionário por RF",
         parameters=[
-            OpenApiParameter("registroFuncional", str, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "registroFuncional", str, OpenApiParameter.PATH
+            ),
         ],
-        responses={200: FuncionarioUESerializer(many=True), 400: dict, 404: dict},
+        responses={200: list, 400: dict, 404: dict},
     )
-    def get(self, request: Request, registroFuncional: str) -> Response:
-        return Response(repository.cargos_funcionario(registroFuncional))
+    def get(
+        self, request: Request, registro_funcional: str
+    ) -> Response:
+        """Retorna lista mock de cargos do funcionário."""
+        return Response(_MOCK_CARGOS)
 
 
 # ---------------------------------------------------------------------------
@@ -236,13 +327,11 @@ class FuncionarioExternoPorCpfView(APIView):
         parameters=[
             OpenApiParameter("cpf", str, OpenApiParameter.PATH),
         ],
-        responses={200: FuncionarioExternoCpfSerializer, 400: dict, 404: dict},
+        responses={200: dict, 400: dict, 404: dict},
     )
     def get(self, request: Request, cpf: str) -> Response:
-        resultado = repository.funcionario_externo_por_cpf(cpf)
-        if resultado is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(resultado)
+        """Retorna dados mock do funcionário externo."""
+        return Response(PROFESSOR_EXTERNO_MOCK)
 
 
 # ---------------------------------------------------------------------------
@@ -257,15 +346,17 @@ class NomeServidorView(APIView):
         tags=_TAG_FUNC,
         summary="EP-31 | Obter nome e CPF do servidor por RF",
         parameters=[
-            OpenApiParameter("registroFuncional", str, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "registroFuncional", str, OpenApiParameter.PATH
+            ),
         ],
-        responses={200: NomeServidorSerializer, 400: dict, 404: dict},
+        responses={200: dict, 400: dict, 404: dict},
     )
-    def get(self, request: Request, registroFuncional: str) -> Response:
-        resultado = repository.nome_servidor(registroFuncional)
-        if resultado is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(resultado)
+    def get(
+        self, request: Request, registro_funcional: str
+    ) -> Response:
+        """Retorna nome e CPF mock do servidor."""
+        return Response(_MOCK_NOME_SERVIDOR)
 
 
 # ---------------------------------------------------------------------------
@@ -280,15 +371,17 @@ class DreUeAtribuicaoFuncionarioView(APIView):
         tags=_TAG_FUNC,
         summary="EP-32 | Obter DRE/UE de atribuição do funcionário",
         parameters=[
-            OpenApiParameter("registroFuncional", str, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "registroFuncional", str, OpenApiParameter.PATH
+            ),
         ],
-        responses={200: DreUeAtribuicaoSerializer, 400: dict, 404: dict},
+        responses={200: dict, 400: dict, 404: dict},
     )
-    def get(self, request: Request, registroFuncional: str) -> Response:
-        resultado = repository.dre_ue_atribuicao(registroFuncional)
-        if resultado is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(resultado)
+    def get(
+        self, request: Request, registro_funcional: str
+    ) -> Response:
+        """Retorna DRE/UE mock do funcionário."""
+        return Response(_MOCK_DRE_UE)
 
 
 # ---------------------------------------------------------------------------
@@ -303,12 +396,17 @@ class ServidorAtivoView(APIView):
         tags=_TAG_ACESSO,
         summary="EP-33 | Verificar se servidor está ativo",
         parameters=[
-            OpenApiParameter("registroFuncional", str, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "registroFuncional", str, OpenApiParameter.PATH
+            ),
         ],
         responses={200: bool, 400: dict, 404: dict},
     )
-    def get(self, request: Request, registroFuncional: str) -> Response:
-        return Response(repository.servidor_ativo(registroFuncional))
+    def get(
+        self, request: Request, registro_funcional: str
+    ) -> Response:
+        """Retorna true (servidor ativo) no mock."""
+        return Response(True)
 
 
 # ---------------------------------------------------------------------------
@@ -323,21 +421,21 @@ class DreUeAtribuicaoCargoView(APIView):
         tags=_TAG_FUNC,
         summary="EP-34 | Obter DRE/UE do funcionário por cargo específico",
         parameters=[
-            OpenApiParameter("registroFuncional", str, OpenApiParameter.PATH),
+            OpenApiParameter(
+                "registroFuncional", str, OpenApiParameter.PATH
+            ),
             OpenApiParameter("codigoCargo", int, OpenApiParameter.PATH),
         ],
-        responses={200: DreUeCargoSerializer, 400: dict, 404: dict},
+        responses={200: dict, 400: dict, 404: dict},
     )
     def get(
         self,
         request: Request,
-        registroFuncional: str,
-        codigoCargo: int,
+        registro_funcional: str,
+        codigo_cargo: int,
     ) -> Response:
-        resultado = repository.dre_ue_cargo(registroFuncional, codigoCargo)
-        if resultado is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(resultado)
+        """Retorna DRE/UE/cargo mock do funcionário."""
+        return Response(_MOCK_DRE_UE_CARGO)
 
 
 # ---------------------------------------------------------------------------
@@ -353,24 +451,27 @@ class UsuariosSGPView(APIView):
         summary="EP-35 | Buscar usuários SGP por perfil",
         parameters=[
             OpenApiParameter("idPerfil", str, OpenApiParameter.PATH),
-            OpenApiParameter("CodigoDre", str, OpenApiParameter.QUERY, required=False),
-            OpenApiParameter("CodigoUe", str, OpenApiParameter.QUERY, required=False),
-            OpenApiParameter("CodigoRf", str, OpenApiParameter.QUERY, required=False),
             OpenApiParameter(
-                "NomeServidor", str, OpenApiParameter.QUERY, required=False
+                "CodigoDre", str, OpenApiParameter.QUERY, required=False
+            ),
+            OpenApiParameter(
+                "CodigoUe", str, OpenApiParameter.QUERY, required=False
+            ),
+            OpenApiParameter(
+                "CodigoRf", str, OpenApiParameter.QUERY, required=False
+            ),
+            OpenApiParameter(
+                "NomeServidor",
+                str,
+                OpenApiParameter.QUERY,
+                required=False,
             ),
         ],
-        responses={200: UsuarioSGPSerializer(many=True), 400: dict, 404: dict},
+        responses={200: list, 400: dict, 404: dict},
     )
-    def get(self, request: Request, idPerfil: str) -> Response:
-        resultado = repository.usuarios_sgp_por_perfil(
-            idPerfil,
-            codigo_dre=request.query_params.get("CodigoDre"),
-            codigo_ue=request.query_params.get("CodigoUe"),
-            codigo_rf=request.query_params.get("CodigoRf"),
-            nome_servidor_param=request.query_params.get("NomeServidor"),
-        )
-        return Response(resultado)
+    def get(self, request: Request, id_perfil: str) -> Response:
+        """Retorna lista mock de usuários SGP."""
+        return Response(_MOCK_USUARIOS_SGP)
 
 
 # ---------------------------------------------------------------------------
@@ -387,28 +488,32 @@ class FuncionariosSGPDreView(APIView):
         parameters=[
             OpenApiParameter("idPerfil", str, OpenApiParameter.PATH),
             OpenApiParameter("codigoDre", str, OpenApiParameter.PATH),
-            OpenApiParameter("CodigoUe", str, OpenApiParameter.QUERY, required=False),
-            OpenApiParameter("CodigoRF", str, OpenApiParameter.QUERY, required=False),
             OpenApiParameter(
-                "NomeServidor", str, OpenApiParameter.QUERY, required=False
+                "CodigoUe", str, OpenApiParameter.QUERY, required=False
             ),
             OpenApiParameter(
-                "CodigoFuncaoAtividade", int, OpenApiParameter.QUERY, required=False
+                "CodigoRF", str, OpenApiParameter.QUERY, required=False
+            ),
+            OpenApiParameter(
+                "NomeServidor",
+                str,
+                OpenApiParameter.QUERY,
+                required=False,
+            ),
+            OpenApiParameter(
+                "CodigoFuncaoAtividade",
+                int,
+                OpenApiParameter.QUERY,
+                required=False,
             ),
         ],
-        responses={200: UsuarioSGPSerializer(many=True), 400: dict, 404: dict},
+        responses={200: list, 400: dict, 404: dict},
     )
-    def get(self, request: Request, idPerfil: str, codigoDre: str) -> Response:
-        funcao_str = request.query_params.get("CodigoFuncaoAtividade")
-        resultado = repository.funcionarios_sgp_dre(
-            idPerfil,
-            codigoDre,
-            codigo_ue=request.query_params.get("CodigoUe"),
-            codigo_rf=request.query_params.get("CodigoRF"),
-            nome_servidor_param=request.query_params.get("NomeServidor"),
-            codigo_funcao_atividade=int(funcao_str) if funcao_str else None,
-        )
-        return Response(resultado)
+    def get(
+        self, request: Request, id_perfil: str, codigo_dre: str
+    ) -> Response:
+        """Retorna lista mock de funcionários SGP por DRE."""
+        return Response(_MOCK_USUARIOS_SGP)
 
 
 # ---------------------------------------------------------------------------
@@ -427,8 +532,9 @@ class AcessoSondagemView(APIView):
         ],
         responses={200: bool},
     )
-    def get(self, request: Request, codigoRF: str) -> Response:
-        return Response(repository.acesso_sondagem(codigoRF))
+    def get(self, request: Request, codigo_rf: str) -> Response:
+        """Retorna true (tem acesso à sondagem) no mock."""
+        return Response(True)
 
 
 # ---------------------------------------------------------------------------
@@ -443,11 +549,11 @@ class BuscarPorListaRFView(APIView):
         tags=_TAG_FUNC,
         summary="EP-38 | Buscar resumo de funcionários por lista de RF (POST)",
         request=list,
-        responses={200: ResumoFuncionarioSerializer(many=True)},
+        responses={200: list},
     )
     def post(self, request: Request) -> Response:
-        lista = request.data if isinstance(request.data, list) else []
-        return Response(repository.buscar_por_lista_rf_func(lista))
+        """Retorna lista mock de funcionários."""
+        return Response(_MOCK_RESUMO)
 
 
 # ---------------------------------------------------------------------------
@@ -460,10 +566,12 @@ class BuscarPorListaLoginView(APIView):
 
     @extend_schema(
         tags=_TAG_FUNC,
-        summary="EP-39 | Buscar resumo de funcionários por lista de login (POST)",
+        summary=(
+            "EP-39 | Buscar resumo de funcionários por lista de login (POST)"
+        ),
         request=list,
-        responses={200: ResumoFuncionarioSerializer(many=True)},
+        responses={200: list},
     )
     def post(self, request: Request) -> Response:
-        lista = request.data if isinstance(request.data, list) else []
-        return Response(repository.buscar_por_lista_login(lista))
+        """Retorna lista mock de funcionários."""
+        return Response(_MOCK_RESUMO)
