@@ -1,38 +1,10 @@
-"""Testes das views mock do domínio Funcionários (EP-25 a EP-39)."""
+"""Testes das views do domínio Funcionários (EP-25 a EP-39)."""
 
-import json
+import pytest
 
-from django.test import Client, SimpleTestCase, override_settings
+pytestmark = pytest.mark.django_db
 
-API_KEY = "test-key"
-HEADERS = {"HTTP_X_API_KEY": API_KEY}
-
-
-def _json(response):
-    return json.loads(response.content)
-
-
-class _AuthedMixin:
-    def setUp(self):
-        super().setUp()
-        self.authed = _AuthedClient(self.client)
-
-
-class _AuthedClient:
-    def __init__(self, client: Client):
-        self._c = client
-
-    def get(self, url: str, **kwargs):
-        return self._c.get(url, **{**HEADERS, **kwargs})
-
-    def post(self, url: str, data=None, **kwargs):
-        body = json.dumps(data or [])
-        return self._c.post(
-            url,
-            body,
-            content_type="application/json",
-            **{**HEADERS, **kwargs},
-        )
+_BASE = "/api"
 
 
 # ---------------------------------------------------------------------------
@@ -40,152 +12,166 @@ class _AuthedClient:
 # ---------------------------------------------------------------------------
 
 
-@override_settings(API_KEY=API_KEY)
-class TestEP25FuncionariosPorUE(_AuthedMixin, SimpleTestCase):
-    def test_retorna_lista(self):
-        resp = self.authed.get("/api/escolas/000532/funcionarios/")
-        self.assertEqual(resp.status_code, 200)
-        self.assertIsInstance(_json(resp), list)
+class TestEP25FuncionariosPorUE:
+    def test_retorna_funcionario_lotado(self, client, lotacao):
+        res = client.get(f"{_BASE}/escolas/000532/funcionarios/")
+        assert res.status_code == 200
+        assert any(f["codigoRf"] == "7654321" for f in res.data)
 
-    def test_campos_presentes(self):
-        item = _json(self.authed.get("/api/escolas/000532/funcionarios/"))[0]
-        for campo in ("codigoRf", "nomeServidor", "cargo"):
-            self.assertIn(campo, item)
+    def test_ue_sem_lotacao_retorna_vazio(self, client, db):
+        res = client.get(f"{_BASE}/escolas/000532/funcionarios/")
+        assert res.status_code == 200
+        assert res.data == []
 
-    def test_sem_api_key_retorna_403(self):
-        resp = Client().get("/api/escolas/000532/funcionarios/")
-        self.assertEqual(resp.status_code, 403)
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.get(f"{_BASE}/escolas/000532/funcionarios/")
+        assert res.status_code == 403
 
 
 # ---------------------------------------------------------------------------
-# EP-26 — Funcionários por cargo específico
+# EP-26 — Funcionários de uma UE por cargo específico
 # ---------------------------------------------------------------------------
 
 
-@override_settings(API_KEY=API_KEY)
-class TestEP26FuncionariosPorCargo(_AuthedMixin, SimpleTestCase):
-    def test_retorna_lista(self):
-        resp = self.authed.get(
-            "/api/escolas/000532/funcionarios/cargos/3239/"
+class TestEP26FuncionariosPorUECargo:
+    def test_cargo_correto_retorna_funcionario(self, client, lotacao):
+        res = client.get(f"{_BASE}/escolas/000532/funcionarios/cargos/3379/")
+        assert res.status_code == 200
+        assert any(f["codigoRf"] == "7654321" for f in res.data)
+
+    def test_cargo_errado_retorna_vazio(self, client, lotacao):
+        res = client.get(f"{_BASE}/escolas/000532/funcionarios/cargos/9999/")
+        assert res.status_code == 200
+        assert res.data == []
+
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.get(f"{_BASE}/escolas/000532/funcionarios/cargos/3379/")
+        assert res.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# EP-26-B — Funcionários de uma UE por lista de cargos (query)
+# ---------------------------------------------------------------------------
+
+
+class TestEP26BFuncionariosCargosQuery:
+    def test_cargo_na_lista_retorna_funcionario(self, client, lotacao):
+        res = client.get(
+            f"{_BASE}/escolas/000532/funcionarios/cargos/?cargos=3379&cargos=3085"
         )
-        self.assertEqual(resp.status_code, 200)
-        self.assertIsInstance(_json(resp), list)
+        assert res.status_code == 200
+        assert any(f["codigoRf"] == "7654321" for f in res.data)
 
-    def test_cargo_diferente_retorna_200(self):
-        resp = self.authed.get(
-            "/api/escolas/000532/funcionarios/cargos/3247/"
+    def test_sem_cargos_retorna_todos_da_ue(self, client, lotacao):
+        res = client.get(f"{_BASE}/escolas/000532/funcionarios/cargos/")
+        assert res.status_code == 200
+        assert any(f["codigoRf"] == "7654321" for f in res.data)
+
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.get(f"{_BASE}/escolas/000532/funcionarios/cargos/?cargos=3379")
+        assert res.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# EP-27 — Funcionários de uma UE por função de atividade
+# ---------------------------------------------------------------------------
+
+
+class TestEP27FuncionariosFuncaoAtividade:
+    def test_retorna_funcionario_com_funcao(self, client, funcao_atividade):
+        res = client.get(
+            f"{_BASE}/escolas/000532/funcionarios/funcoes-atividades/1/"
         )
-        self.assertEqual(resp.status_code, 200)
+        assert res.status_code == 200
+        assert any(f["codigoRf"] == "7654321" for f in res.data)
 
-
-# ---------------------------------------------------------------------------
-# EP-26-B — Funcionários por lista de cargos (query)
-# ---------------------------------------------------------------------------
-
-
-@override_settings(API_KEY=API_KEY)
-class TestEP26BFuncionariosCargosQuery(_AuthedMixin, SimpleTestCase):
-    def test_retorna_lista(self):
-        resp = self.authed.get("/api/escolas/000532/funcionarios/cargos/")
-        self.assertEqual(resp.status_code, 200)
-        self.assertIsInstance(_json(resp), list)
-
-    def test_com_query_cargos(self):
-        resp = self.authed.get(
-            "/api/escolas/000532/funcionarios/cargos/"
-            "?cargos=3239&cargos=3247"
+    def test_sem_funcao_retorna_vazio(self, client, db):
+        res = client.get(
+            f"{_BASE}/escolas/000532/funcionarios/funcoes-atividades/1/"
         )
-        self.assertEqual(resp.status_code, 200)
+        assert res.status_code == 200
+        assert res.data == []
 
-    def test_com_dre(self):
-        resp = self.authed.get(
-            "/api/escolas/000532/funcionarios/cargos/?dreCodigo=108100"
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.get(
+            f"{_BASE}/escolas/000532/funcionarios/funcoes-atividades/1/"
         )
-        self.assertEqual(resp.status_code, 200)
+        assert res.status_code == 403
 
 
 # ---------------------------------------------------------------------------
-# EP-27 — Funcionários por função de atividade específica
+# EP-27-B — Funcionários de uma UE por lista de funções de atividade (query)
 # ---------------------------------------------------------------------------
 
 
-@override_settings(API_KEY=API_KEY)
-class TestEP27FuncaoAtividade(_AuthedMixin, SimpleTestCase):
-    def test_retorna_lista(self):
-        resp = self.authed.get(
-            "/api/escolas/000532/funcionarios/funcoes-atividades/5/"
+class TestEP27BFuncionariosFuncoesAtividadesQuery:
+    def test_retorna_funcionario_com_funcao(self, client, funcao_atividade):
+        res = client.get(
+            f"{_BASE}/escolas/000532/funcionarios/funcoes-atividades/"
+            "?funcoesAtividades=1&funcoesAtividades=2"
         )
-        self.assertEqual(resp.status_code, 200)
-        self.assertIsInstance(_json(resp), list)
+        assert res.status_code == 200
+        assert any(f["codigoRf"] == "7654321" for f in res.data)
 
-
-# ---------------------------------------------------------------------------
-# EP-27-B — Funcionários por lista de funções de atividade (query)
-# ---------------------------------------------------------------------------
-
-
-@override_settings(API_KEY=API_KEY)
-class TestEP27BFuncoesAtividadesQuery(_AuthedMixin, SimpleTestCase):
-    def test_retorna_lista(self):
-        resp = self.authed.get(
-            "/api/escolas/000532/funcionarios/funcoes-atividades/"
-            "?dreCodigo=108100"
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.get(
+            f"{_BASE}/escolas/000532/funcionarios/funcoes-atividades/"
         )
-        self.assertEqual(resp.status_code, 200)
-        self.assertIsInstance(_json(resp), list)
-
-    def test_com_funcoes_e_dre(self):
-        resp = self.authed.get(
-            "/api/escolas/000532/funcionarios/funcoes-atividades/"
-            "?funcoesAtividades=1&funcoesAtividades=2&dreCodigo=108100"
-        )
-        self.assertEqual(resp.status_code, 200)
+        assert res.status_code == 403
 
 
 # ---------------------------------------------------------------------------
-# EP-28 — Funcionários por função externa específica
+# EP-28 — Funcionários de uma UE por função externa
 # ---------------------------------------------------------------------------
 
 
-@override_settings(API_KEY=API_KEY)
-class TestEP28FuncaoExterna(_AuthedMixin, SimpleTestCase):
-    def test_retorna_lista(self):
-        resp = self.authed.get(
-            "/api/escolas/000532/funcionarios/funcoes-externas/10/"
+class TestEP28FuncionariosFuncaoExterna:
+    def test_funcao_correta_retorna_externo(self, client, contrato_externo):
+        res = client.get(
+            f"{_BASE}/escolas/000532/funcionarios/funcoes-externas/5/"
         )
-        self.assertEqual(resp.status_code, 200)
-        self.assertIsInstance(_json(resp), list)
+        assert res.status_code == 200
+        assert any(f["cpf"] == "98765432100" for f in res.data)
 
-    def test_campos_externos(self):
-        item = _json(
-            self.authed.get(
-                "/api/escolas/000532/funcionarios/funcoes-externas/10/"
-            )
-        )[0]
-        for campo in ("cpf", "nomeServidor", "codigoEscola"):
-            self.assertIn(campo, item)
+    def test_funcao_errada_retorna_vazio(self, client, contrato_externo):
+        res = client.get(
+            f"{_BASE}/escolas/000532/funcionarios/funcoes-externas/999/"
+        )
+        assert res.status_code == 200
+        assert res.data == []
+
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.get(
+            f"{_BASE}/escolas/000532/funcionarios/funcoes-externas/5/"
+        )
+        assert res.status_code == 403
 
 
 # ---------------------------------------------------------------------------
-# EP-28-B — Funcionários por lista de funções externas (query)
+# EP-28-B — Funcionários de uma UE por lista de funções externas (query)
 # ---------------------------------------------------------------------------
 
 
-@override_settings(API_KEY=API_KEY)
-class TestEP28BFuncoesExternasQuery(_AuthedMixin, SimpleTestCase):
-    def test_retorna_lista(self):
-        resp = self.authed.get(
-            "/api/escolas/000532/funcionarios/funcoes-externas/"
+class TestEP28BFuncionariosFuncoesExternasQuery:
+    def test_funcao_na_lista_retorna_externo(self, client, contrato_externo):
+        res = client.get(
+            f"{_BASE}/escolas/000532/funcionarios/funcoes-externas/?funcoes=5&funcoes=6"
         )
-        self.assertEqual(resp.status_code, 200)
-        self.assertIsInstance(_json(resp), list)
+        assert res.status_code == 200
+        assert any(f["cpf"] == "98765432100" for f in res.data)
 
-    def test_com_funcoes_query(self):
-        resp = self.authed.get(
-            "/api/escolas/000532/funcionarios/funcoes-externas/"
-            "?funcoes=10&funcoes=11"
+    def test_lista_sem_match_retorna_vazio(self, client, contrato_externo):
+        res = client.get(
+            f"{_BASE}/escolas/000532/funcionarios/funcoes-externas/?funcoes=999"
         )
-        self.assertEqual(resp.status_code, 200)
+        assert res.status_code == 200
+        assert res.data == []
+
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.get(
+            f"{_BASE}/escolas/000532/funcionarios/funcoes-externas/"
+        )
+        assert res.status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -193,21 +179,21 @@ class TestEP28BFuncoesExternasQuery(_AuthedMixin, SimpleTestCase):
 # ---------------------------------------------------------------------------
 
 
-@override_settings(API_KEY=API_KEY)
-class TestEP29CargosFuncionario(_AuthedMixin, SimpleTestCase):
-    def test_retorna_lista(self):
-        resp = self.authed.get("/api/funcionarios/cargo/7654321/")
-        self.assertEqual(resp.status_code, 200)
-        self.assertIsInstance(_json(resp), list)
+class TestEP29CargosFuncionario:
+    def test_retorna_cargo_do_servidor(self, client, cargo_base):
+        res = client.get(f"{_BASE}/funcionarios/cargo/7654321/")
+        assert res.status_code == 200
+        assert len(res.data) >= 1
+        assert res.data[0]["codigoRf"] == "7654321"
 
-    def test_campos_cargo(self):
-        item = _json(self.authed.get("/api/funcionarios/cargo/7654321/"))[0]
-        for campo in ("codigoRf", "nomeServidor", "cargo", "dataInicio"):
-            self.assertIn(campo, item)
+    def test_sem_cargo_retorna_lista_vazia(self, client, db):
+        res = client.get(f"{_BASE}/funcionarios/cargo/7654321/")
+        assert res.status_code == 200
+        assert res.data == []
 
-    def test_rf_diferente_retorna_200(self):
-        resp = self.authed.get("/api/funcionarios/cargo/9999999/")
-        self.assertEqual(resp.status_code, 200)
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.get(f"{_BASE}/funcionarios/cargo/7654321/")
+        assert res.status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -215,22 +201,19 @@ class TestEP29CargosFuncionario(_AuthedMixin, SimpleTestCase):
 # ---------------------------------------------------------------------------
 
 
-@override_settings(API_KEY=API_KEY)
-class TestEP30FuncionarioExternoPorCpf(_AuthedMixin, SimpleTestCase):
-    def test_retorna_dados(self):
-        resp = self.authed.get(
-            "/api/funcionarios/funcionario-externo/987.654.321-00/"
-        )
-        self.assertEqual(resp.status_code, 200)
-        data = _json(resp)
-        for campo in ("cpf", "nome", "codigoUe"):
-            self.assertIn(campo, data)
+class TestEP30FuncionarioExternoPorCpf:
+    def test_encontrado_retorna_dados(self, client, contrato_externo):
+        res = client.get(f"{_BASE}/funcionarios/funcionario-externo/98765432100/")
+        assert res.status_code == 200
+        assert res.data["cpf"] == "98765432100"
 
-    def test_cpf_diferente_retorna_200(self):
-        resp = self.authed.get(
-            "/api/funcionarios/funcionario-externo/000.000.000-00/"
-        )
-        self.assertEqual(resp.status_code, 200)
+    def test_nao_encontrado_retorna_404(self, client, db):
+        res = client.get(f"{_BASE}/funcionarios/funcionario-externo/00000000000/")
+        assert res.status_code == 404
+
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.get(f"{_BASE}/funcionarios/funcionario-externo/98765432100/")
+        assert res.status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -238,18 +221,21 @@ class TestEP30FuncionarioExternoPorCpf(_AuthedMixin, SimpleTestCase):
 # ---------------------------------------------------------------------------
 
 
-@override_settings(API_KEY=API_KEY)
-class TestEP31NomeServidor(_AuthedMixin, SimpleTestCase):
-    def test_retorna_nome_e_cpf(self):
-        resp = self.authed.get("/api/funcionarios/nome-servidor/7654321/")
-        self.assertEqual(resp.status_code, 200)
-        data = _json(resp)
-        for campo in ("codigoRf", "nome", "cpf"):
-            self.assertIn(campo, data)
+class TestEP31NomeServidor:
+    def test_encontrado_retorna_nome_e_cpf(self, client, professor):
+        res = client.get(f"{_BASE}/funcionarios/nome-servidor/7654321/")
+        assert res.status_code == 200
+        assert res.data["codigoRf"] == "7654321"
+        assert res.data["nome"] == "Ana Silva"
+        assert res.data["cpf"] == "12345678900"
 
-    def test_rf_diferente_retorna_200(self):
-        resp = self.authed.get("/api/funcionarios/nome-servidor/9999999/")
-        self.assertEqual(resp.status_code, 200)
+    def test_nao_encontrado_retorna_404(self, client, db):
+        res = client.get(f"{_BASE}/funcionarios/nome-servidor/0000000/")
+        assert res.status_code == 404
+
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.get(f"{_BASE}/funcionarios/nome-servidor/7654321/")
+        assert res.status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -257,14 +243,26 @@ class TestEP31NomeServidor(_AuthedMixin, SimpleTestCase):
 # ---------------------------------------------------------------------------
 
 
-@override_settings(API_KEY=API_KEY)
-class TestEP32DreUeAtribuicao(_AuthedMixin, SimpleTestCase):
-    def test_retorna_dre_ue(self):
-        resp = self.authed.get("/api/funcionarios/nome-usuario-eol/7654321/")
-        self.assertEqual(resp.status_code, 200)
-        data = _json(resp)
-        for campo in ("codigoRf", "nome", "codigoDre", "codigoUe"):
-            self.assertIn(campo, data)
+class TestEP32DreUeAtribuicao:
+    def test_com_lotacao_retorna_dre_e_ue(self, client, lotacao, ue):
+        res = client.get(f"{_BASE}/funcionarios/nome-usuario-eol/7654321/")
+        assert res.status_code == 200
+        assert res.data["codigoRf"] == "7654321"
+        assert res.data["codigoUe"] == "000532"
+        assert res.data["codigoDre"] == "108100"
+
+    def test_sem_lotacao_retorna_campos_nulos(self, client, professor):
+        res = client.get(f"{_BASE}/funcionarios/nome-usuario-eol/7654321/")
+        assert res.status_code == 200
+        assert res.data["codigoUe"] is None
+
+    def test_nao_encontrado_retorna_404(self, client, db):
+        res = client.get(f"{_BASE}/funcionarios/nome-usuario-eol/0000000/")
+        assert res.status_code == 404
+
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.get(f"{_BASE}/funcionarios/nome-usuario-eol/7654321/")
+        assert res.status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -272,71 +270,82 @@ class TestEP32DreUeAtribuicao(_AuthedMixin, SimpleTestCase):
 # ---------------------------------------------------------------------------
 
 
-@override_settings(API_KEY=API_KEY)
-class TestEP33ServidorAtivo(_AuthedMixin, SimpleTestCase):
-    def test_retorna_true(self):
-        resp = self.authed.get("/api/acessos/funcionario-ativo/7654321/")
-        self.assertEqual(resp.status_code, 200)
-        self.assertIs(_json(resp), True)
+class TestEP33ServidorAtivo:
+    def test_cargo_sem_fim_retorna_true(self, client, cargo_base):
+        # dt_fim_nomeacao=None → servidor ativo
+        res = client.get(f"{_BASE}/acessos/funcionario-ativo/7654321/")
+        assert res.status_code == 200
+        assert res.data is True
 
-    def test_rf_qualquer_retorna_200(self):
-        resp = self.authed.get("/api/acessos/funcionario-ativo/9999999/")
-        self.assertEqual(resp.status_code, 200)
+    def test_sem_cargo_retorna_false(self, client, db):
+        res = client.get(f"{_BASE}/acessos/funcionario-ativo/7654321/")
+        assert res.status_code == 200
+        assert res.data is False
 
-    def test_sem_api_key_retorna_403(self):
-        resp = Client().get("/api/acessos/funcionario-ativo/7654321/")
-        self.assertEqual(resp.status_code, 403)
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.get(f"{_BASE}/acessos/funcionario-ativo/7654321/")
+        assert res.status_code == 403
 
 
 # ---------------------------------------------------------------------------
-# EP-34 — DRE/UE do funcionário por cargo
+# EP-34 — DRE/UE do funcionário por cargo específico
 # ---------------------------------------------------------------------------
 
 
-@override_settings(API_KEY=API_KEY)
-class TestEP34DreUeAtribuicaoCargo(_AuthedMixin, SimpleTestCase):
-    def test_retorna_dre_ue_cargo(self):
-        resp = self.authed.get(
-            "/api/funcionarios/atribuicao/7654321/cargo/3239/"
-        )
-        self.assertEqual(resp.status_code, 200)
-        data = _json(resp)
-        for campo in ("codigoRf", "codigoDre", "codigoUe", "cargo"):
-            self.assertIn(campo, data)
+class TestEP34DreUeAtribuicaoCargo:
+    def test_cargo_com_lotacao_retorna_dre_ue(self, client, lotacao):
+        res = client.get(f"{_BASE}/funcionarios/atribuicao/7654321/cargo/3379/")
+        assert res.status_code == 200
+        assert res.data["codigoRf"] == "7654321"
+        assert res.data["codigoUe"] == "000532"
 
-    def test_cargo_diferente_retorna_200(self):
-        resp = self.authed.get(
-            "/api/funcionarios/atribuicao/7654321/cargo/3247/"
-        )
-        self.assertEqual(resp.status_code, 200)
+    def test_cargo_sem_lotacao_retorna_ue_nula(self, client, cargo_base):
+        res = client.get(f"{_BASE}/funcionarios/atribuicao/7654321/cargo/3379/")
+        assert res.status_code == 200
+        assert res.data["codigoUe"] is None
+
+    def test_cargo_inexistente_retorna_404(self, client, db):
+        res = client.get(f"{_BASE}/funcionarios/atribuicao/0000000/cargo/3379/")
+        assert res.status_code == 404
+
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.get(f"{_BASE}/funcionarios/atribuicao/7654321/cargo/3379/")
+        assert res.status_code == 403
 
 
 # ---------------------------------------------------------------------------
 # EP-35 — Usuários SGP por perfil
 # ---------------------------------------------------------------------------
 
-_PERFIL = "550e8400-e29b-41d4-a716-446655440000"
 
+class TestEP35UsuariosSGP:
+    def test_retorna_funcionario_com_lotacao_ativa(self, client, lotacao):
+        res = client.get(f"{_BASE}/funcionarios/perfis/perfil-guid-123/")
+        assert res.status_code == 200
+        assert any(u["codigoRf"] == "7654321" for u in res.data)
 
-@override_settings(API_KEY=API_KEY)
-class TestEP35UsuariosSGP(_AuthedMixin, SimpleTestCase):
-    def test_retorna_lista(self):
-        resp = self.authed.get(f"/api/funcionarios/perfis/{_PERFIL}/")
-        self.assertEqual(resp.status_code, 200)
-        self.assertIsInstance(_json(resp), list)
-
-    def test_campos_presentes(self):
-        resp = self.authed.get(f"/api/funcionarios/perfis/{_PERFIL}/")
-        item = _json(resp)[0]
-        for campo in ("codigoRf", "nomeServidor", "codigoDre", "codigoUe"):
-            self.assertIn(campo, item)
-
-    def test_com_filtros_query(self):
-        resp = self.authed.get(
-            f"/api/funcionarios/perfis/{_PERFIL}/"
-            "?CodigoDre=108100&CodigoUe=000532"
+    def test_filtro_ue_retorna_apenas_da_ue(self, client, lotacao):
+        res = client.get(
+            f"{_BASE}/funcionarios/perfis/perfil-guid-123/?CodigoUe=000532"
         )
-        self.assertEqual(resp.status_code, 200)
+        assert res.status_code == 200
+        assert any(u["codigoRf"] == "7654321" for u in res.data)
+
+    def test_filtro_ue_errada_retorna_vazio(self, client, lotacao):
+        res = client.get(
+            f"{_BASE}/funcionarios/perfis/perfil-guid-123/?CodigoUe=999999"
+        )
+        assert res.status_code == 200
+        assert res.data == []
+
+    def test_sem_lotacao_ativa_retorna_vazio(self, client, db):
+        res = client.get(f"{_BASE}/funcionarios/perfis/perfil-guid-123/")
+        assert res.status_code == 200
+        assert res.data == []
+
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.get(f"{_BASE}/funcionarios/perfis/perfil-guid-123/")
+        assert res.status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -344,49 +353,65 @@ class TestEP35UsuariosSGP(_AuthedMixin, SimpleTestCase):
 # ---------------------------------------------------------------------------
 
 
-@override_settings(API_KEY=API_KEY)
-class TestEP36FuncionariosSGPDre(_AuthedMixin, SimpleTestCase):
-    def _url(self, suffix=""):
-        return f"/api/funcionarios/perfis/{_PERFIL}/dres/108100/{suffix}"
-
-    def test_retorna_lista(self):
-        resp = self.authed.get(self._url())
-        self.assertEqual(resp.status_code, 200)
-        self.assertIsInstance(_json(resp), list)
-
-    def test_campos_presentes(self):
-        item = _json(self.authed.get(self._url()))[0]
-        for campo in ("codigoRf", "nomeServidor"):
-            self.assertIn(campo, item)
-
-    def test_com_filtros(self):
-        resp = self.authed.get(
-            self._url("?CodigoUe=000532&NomeServidor=Maria")
+class TestEP36FuncionariosSGPDre:
+    def test_retorna_funcionario_da_dre(self, client, lotacao, ue):
+        res = client.get(
+            f"{_BASE}/funcionarios/perfis/perfil-guid-123/dres/108100/"
         )
-        self.assertEqual(resp.status_code, 200)
+        assert res.status_code == 200
+        assert any(u["codigoRf"] == "7654321" for u in res.data)
+
+    def test_dre_sem_funcionarios_retorna_vazio(self, client, db):
+        res = client.get(
+            f"{_BASE}/funcionarios/perfis/perfil-guid-123/dres/108100/"
+        )
+        assert res.status_code == 200
+        assert res.data == []
+
+    def test_filtro_rf_retorna_especifico(self, client, lotacao, ue):
+        res = client.get(
+            f"{_BASE}/funcionarios/perfis/perfil-guid-123/dres/108100/"
+            "?CodigoRF=7654321"
+        )
+        assert res.status_code == 200
+        assert len(res.data) == 1
+        assert res.data[0]["codigoRf"] == "7654321"
+
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.get(
+            f"{_BASE}/funcionarios/perfis/perfil-guid-123/dres/108100/"
+        )
+        assert res.status_code == 403
 
 
 # ---------------------------------------------------------------------------
-# EP-37 — Acesso à sondagem
+# EP-37 — Verificar acesso à sondagem
 # ---------------------------------------------------------------------------
 
 
-@override_settings(API_KEY=API_KEY)
-class TestEP37AcessoSondagem(_AuthedMixin, SimpleTestCase):
-    def test_retorna_true(self):
-        resp = self.authed.get(
-            "/api/perfis/servidores/7654321"
+class TestEP37AcessoSondagem:
+    def test_com_atribuicao_retorna_true(self, client, atribuicao):
+        res = client.get(
+            f"{_BASE}/perfis/servidores/7654321"
             "/VerificaSeProfessorTemAcessoAhSondagem/"
         )
-        self.assertEqual(resp.status_code, 200)
-        self.assertIs(_json(resp), True)
+        assert res.status_code == 200
+        assert res.data is True
 
-    def test_rf_diferente_retorna_200(self):
-        resp = self.authed.get(
-            "/api/perfis/servidores/9999999"
+    def test_sem_atribuicao_retorna_false(self, client, db):
+        res = client.get(
+            f"{_BASE}/perfis/servidores/7654321"
             "/VerificaSeProfessorTemAcessoAhSondagem/"
         )
-        self.assertEqual(resp.status_code, 200)
+        assert res.status_code == 200
+        assert res.data is False
+
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.get(
+            f"{_BASE}/perfis/servidores/7654321"
+            "/VerificaSeProfessorTemAcessoAhSondagem/"
+        )
+        assert res.status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -394,28 +419,50 @@ class TestEP37AcessoSondagem(_AuthedMixin, SimpleTestCase):
 # ---------------------------------------------------------------------------
 
 
-@override_settings(API_KEY=API_KEY)
-class TestEP38BuscarPorListaRF(_AuthedMixin, SimpleTestCase):
-    def test_retorna_lista(self):
-        resp = self.authed.post(
-            "/api/funcionarios/BuscarPorListaRF/",
-            ["7654321", "1234567"],
+class TestEP38BuscarPorListaRF:
+    def test_rf_existente_retorna_funcionario(self, client, professor):
+        res = client.post(
+            f"{_BASE}/funcionarios/BuscarPorListaRF/",
+            ["7654321"],
+            format="json",
         )
-        self.assertEqual(resp.status_code, 200)
-        self.assertIsInstance(_json(resp), list)
+        assert res.status_code == 200
+        assert any(f["codigoRf"] == "7654321" for f in res.data)
 
-    def test_campos_presentes(self):
-        item = _json(
-            self.authed.post(
-                "/api/funcionarios/BuscarPorListaRF/", ["7654321"]
-            )
-        )[0]
-        for campo in ("codigoRf", "nome", "cpf"):
-            self.assertIn(campo, item)
+    def test_rf_inexistente_retorna_vazio(self, client, db):
+        res = client.post(
+            f"{_BASE}/funcionarios/BuscarPorListaRF/",
+            ["0000000"],
+            format="json",
+        )
+        assert res.status_code == 200
+        assert res.data == []
 
-    def test_lista_vazia_retorna_200(self):
-        resp = self.authed.post("/api/funcionarios/BuscarPorListaRF/", [])
-        self.assertEqual(resp.status_code, 200)
+    def test_lista_vazia_retorna_vazio(self, client, db):
+        res = client.post(
+            f"{_BASE}/funcionarios/BuscarPorListaRF/",
+            [],
+            format="json",
+        )
+        assert res.status_code == 200
+        assert res.data == []
+
+    def test_corpo_invalido_usa_lista_vazia(self, client, db):
+        res = client.post(
+            f"{_BASE}/funcionarios/BuscarPorListaRF/",
+            {"invalido": True},
+            format="json",
+        )
+        assert res.status_code == 200
+        assert res.data == []
+
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.post(
+            f"{_BASE}/funcionarios/BuscarPorListaRF/",
+            [],
+            format="json",
+        )
+        assert res.status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -423,35 +470,29 @@ class TestEP38BuscarPorListaRF(_AuthedMixin, SimpleTestCase):
 # ---------------------------------------------------------------------------
 
 
-@override_settings(API_KEY=API_KEY)
-class TestEP39BuscarPorListaLogin(_AuthedMixin, SimpleTestCase):
-    def test_retorna_lista(self):
-        resp = self.authed.post(
-            "/api/funcionarios/BuscarPorListaLogin/",
-            ["login1", "login2"],
+class TestEP39BuscarPorListaLogin:
+    def test_login_existente_retorna_funcionario(self, client, professor):
+        res = client.post(
+            f"{_BASE}/funcionarios/BuscarPorListaLogin/",
+            ["7654321"],
+            format="json",
         )
-        self.assertEqual(resp.status_code, 200)
-        self.assertIsInstance(_json(resp), list)
+        assert res.status_code == 200
+        assert any(f["codigoRf"] == "7654321" for f in res.data)
 
-    def test_campos_presentes(self):
-        item = _json(
-            self.authed.post(
-                "/api/funcionarios/BuscarPorListaLogin/", ["login1"]
-            )
-        )[0]
-        for campo in ("codigoRf", "nome", "cpf"):
-            self.assertIn(campo, item)
-
-    def test_lista_vazia_retorna_200(self):
-        resp = self.authed.post(
-            "/api/funcionarios/BuscarPorListaLogin/", []
+    def test_login_inexistente_retorna_vazio(self, client, db):
+        res = client.post(
+            f"{_BASE}/funcionarios/BuscarPorListaLogin/",
+            ["0000000"],
+            format="json",
         )
-        self.assertEqual(resp.status_code, 200)
+        assert res.status_code == 200
+        assert res.data == []
 
-    def test_sem_api_key_retorna_403(self):
-        resp = Client().post(
-            "/api/funcionarios/BuscarPorListaLogin/",
-            json.dumps(["login1"]),
-            content_type="application/json",
+    def test_sem_api_key_retorna_403(self, anon):
+        res = anon.post(
+            f"{_BASE}/funcionarios/BuscarPorListaLogin/",
+            [],
+            format="json",
         )
-        self.assertEqual(resp.status_code, 403)
+        assert res.status_code == 403

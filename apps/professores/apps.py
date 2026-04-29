@@ -4,7 +4,7 @@ from django.apps import AppConfig
 
 
 class ProfessoresConfig(AppConfig):
-    """App mock do domínio Professores."""
+    """App do domínio Professores."""
 
     default_auto_field = "django.db.models.BigAutoField"
     name = "apps.professores"
